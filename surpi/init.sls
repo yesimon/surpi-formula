@@ -246,10 +246,10 @@ amos:
     - name: |
         cd /tmp/amos
         ./bootstrap
-        ./configure --prefix=/opt/stow
+        ./configure --prefix=/opt/amos
         make
         sudo make install
-        sudo stow -d /opt -t /usr/local stow
+        sudo stow -d /opt -t /usr/local amos
     - require:
         - pkg: autoconf
         - pkg: make
