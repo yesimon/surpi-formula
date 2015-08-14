@@ -15,9 +15,6 @@ csh:
 python-dev:
   pkg.installed
 
-python-pip:
-  pkg.installed
-
 gcc:
   pkg.installed
 
@@ -51,7 +48,7 @@ git:
 pigz:
   pkg.installed
 
-moreutils:
+parallel:
   pkg.installed
 
 ncbi-blast+:
@@ -66,11 +63,29 @@ seqtk: # version 1.0-r31
 stow:
   pkg.installed
 
-cutadapt:
-  pip.installed:
-    - name: cutadapt == 1.8.3
+# Ubuntu installs very old version of pip. Which cannot be used to upgrade
+# itself via a pip.installed state. Thus we need to install manually.
+# See: https://github.com/caktus/margarita/issues/35
+python-pip:
+  pkg.installed
+
+pip:
+  cmd.run:
+    - unless: test -x /usr/local/bin/pip
+    - name: |
+        cd /tmp
+        wget -c https://bootstrap.pypa.io/get-pip.py
+        python get-pip.py
+    - cwd: /tmp
+    - user: root
     - require:
         - pkg: python-pip
+
+cutadapt:
+  pip.installed:
+    - name: cutadapt==1.8.3
+    - require:
+        - cmd: pip
 
 DBI:
   cmd.run:
@@ -91,7 +106,7 @@ statistics-descriptive:
     - name: sudo cpanm Statistics::Descriptive
     - require:
         - pkg: cpanminus
-    - unless: test -d /usr/local/lib/*/perl/*/Statistics/Descriptive
+    - unless: test -d /usr/local/lib/*/perl/*/auto/Statistics/Descriptive
 
 xml-parser:
   cmd.run:
@@ -141,10 +156,11 @@ prinseq-lite:
         - pkg: curl
     - unless: test -x /usr/local/bin/prinseq-lite.pl
 
-/usr/local/bin/snap-aligner:
+/usr/local/bin/snap:
   file.managed:
     - source: https://github.com/amplab/snap/releases/download/v1.0beta.18/snap-aligner
     - source_hash: sha512=87d6a100e24eda308fffae9290a1b4a839b66aaf7b9db533c09c092065019f7f4a185e9c6fb1efb4e5be2aae09c9077b06faadf3d3e948721d2b6a1303bb78e2
+    - mode: 755
 
 libssl-dev:
   pkg.installed
@@ -195,9 +211,9 @@ rapsearch:
   cmd.run:
     - name: |
         cd /tmp/RAPSearch2
-        yes | ./install
-        mv bin/rapsearch /usr/local
-        mv bin/prerapsearch /usr/local
+        yes | sudo ./install
+        mv bin/rapsearch /usr/local/bin
+        mv bin/prerapsearch /usr/local/bin
     - require:
         - pkg: make
         - pkg: g++
@@ -261,12 +277,37 @@ amos:
         - git: amos-git
     - unless: test -x /usr/local/bin/AMOScmp
 
-surpi:
+surpi-git:
   git.latest:
     - name: https://github.com/yesimon/surpi.git
-    - target: /opt/surpi
+    - target: /opt/surpi_git
     - require:
         - pkg: git
+
+surpi:
+  cmd.run:
+    - name: |
+        sudo rm -rf /opt/surpi
+        sudo mkdir -p /opt/surpi/bin
+        cd /opt/surpi/bin
+        find /opt/surpi_git -executable -exec sudo ln -s -f {} \;
+        sudo stow -d /opt -t /usr/local surpi
+    - require:
+        - pkg: stow
+        - git: surpi-git
+    - unless: test -x /usr/local/bin/SURPI.sh
+
+dropcache:
+  cmd.run:
+    - name: |
+        cd /opt/surpi/source
+        sudo gcc dropcache.c -o dropcache
+        sudo chmod 755 dropcache
+        sudo mv dropcache /usr/local/bin
+    - require:
+        - pkg: gcc
+        - git: surpi-git
+    - unless: test -x /usr/local/bin/dropcache
 
 
 # For monitoring cpu/mem.
